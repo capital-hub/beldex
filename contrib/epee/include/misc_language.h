@@ -31,6 +31,7 @@
 #include <limits>
 #include <boost/thread.hpp>
 #include <boost/utility/value_init.hpp>
+#include <boost/chrono/duration.hpp>
 namespace epee
 {
 #define STD_TRY_BEGIN() try {
@@ -97,20 +98,16 @@ namespace misc_utils
 	
 
 	inline
-	bool sleep_no_w(long ms )
+	void sleep_no_w(long ms)
 	{
-		boost::this_thread::sleep( 
-			boost::get_system_time() + 
-			boost::posix_time::milliseconds( std::max<long>(ms,0) ) );
-		
-		return true;
+		boost::this_thread::sleep_for(boost::chrono::milliseconds{ms});
 	}
 
   template<class type_vec_type>
   type_vec_type median(std::vector<type_vec_type> &v)
   {
     if(v.empty())
-      return boost::value_initialized<type_vec_type>();
+      return type_vec_type{};
     if(v.size() == 1)
       return v[0];
 
@@ -158,6 +155,11 @@ namespace misc_utils
     auto_scope_leave_caller slc(new call_befor_die<t_scope_leave_handler>(f));
     return slc;
   }
+
+  template<typename T> struct struct_init: T
+  {
+    struct_init(): T{} {}
+  };
 
 }
 }

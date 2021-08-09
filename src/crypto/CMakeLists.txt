@@ -27,7 +27,7 @@
 # STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 # THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-set(crypto_sources
+add_library(cncrypto
   aesb.c
   blake256.c
   chacha.c
@@ -40,72 +40,56 @@ set(crypto_sources
   hash-extra-jh.c
   hash-extra-skein.c
   hash.c
+  hmac-keccak.c
   jh.c
   keccak.c
   oaes_lib.c
   random.c
   skein.c
-  slow-hash.c
-  cn_conceal.cpp
-  tree-hash.c
-  aux_hash.c)
+  cn_heavy_hash_hard_arm.cpp
+  cn_heavy_hash_hard_intel.cpp
+  cn_heavy_hash_soft.cpp
+  rx-slow-hash.c
+  cn_monero_slow_hash.c
+  tree-hash.c)
 
-set(crypto_headers)
-
-set(crypto_private_headers
-  blake256.h
-  chacha.h
-  crypto-ops.h
-  crypto.h
-  generic-ops.h
-  groestl.h
-  groestl_tables.h
-  hash-ops.h
-  hash.h
-  initializer.h
-  jh.h
-  keccak.h
-  oaes_config.h
-  oaes_lib.h
-  random.h
-  skein.h
-  aux_hash.h
-  cn_conceal.hpp
-  skein_port.h
-  soft_aes.hpp
-  coin_algos.hpp)
-
-beldex_private_headers(cncrypto
-  ${crypto_private_headers})
-beldex_add_library(cncrypto
-  ${crypto_sources}
-  ${crypto_headers}
-  ${crypto_private_headers})
 target_link_libraries(cncrypto
   PUBLIC
     epee
-    ${Boost_SYSTEM_LIBRARY}
-    ${SODIUM_LIBRARY}
+    randomx
+    Boost::system
+    Boost::thread
+    Boost::chrono
+    sodium
   PRIVATE
-    ${EXTRA_LIBRARIES})
-
-	if (ARM)
-  option(NO_OPTIMIZED_MULTIPLY_ON_ARM
-	   "Compute multiply using generic C implementation instead of ARM ASM" OFF)
-  if(NO_OPTIMIZED_MULTIPLY_ON_ARM)
-    message(STATUS "Using generic C implementation for multiply")
-    set_property(SOURCE slow-hash.c
-      PROPERTY COMPILE_DEFINITIONS "NO_OPTIMIZED_MULTIPLY_ON_ARM")
-  endif()
-endif()
+    extra)
 
 # Because of the way Qt works on android with JNI, the code does not live in the main android thread
 # So this code runs with a 1 MB default stack size. 
 # This will force the use of the heap for the allocation of the scratchpad
 if (ANDROID OR IOS)
   if( BUILD_GUI_DEPS )
-    add_definitions(-DFORCE_USE_HEAP=1)
+    target_compile_definitions(cncrypto PUBLIC FORCE_USE_HEAP=1)
   endif()
 endif()
 
+option(NO_AES "Explicitly disable AES support" ${NO_AES})
+
+if(NO_AES)
+  message(STATUS "AES support explicitly disabled")
+  target_compile_definitions(cncrypto PRIVATE NO_AES)
+elseif(NOT ARM AND NOT PPC64LE AND NOT PPC64 AND NOT PPC AND NOT S390X)
+  message(STATUS "AES support enabled")
+  target_compile_options(cncrypto PRIVATE "-maes")
+elseif(PPC64LE OR PPC64 OR PPC)
+  message(STATUS "AES support not available on POWER")
+elseif(S390X)
+  message(STATUS "AES support not available on s390x")
+elseif(ARM6)
+  message(STATUS "AES support not available on ARMv6")
+elseif(ARM7)
+  message(STATUS "AES support not available on ARMv7")
+else()
+  message(STATUS "AES support disabled")
+endif()
 

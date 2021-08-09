@@ -321,7 +321,7 @@ namespace net_utils
       bool connect(std::chrono::milliseconds timeout)
       {
         CRITICAL_REGION_LOCAL(m_lock);
-        return m_net_client.connect(m_host_buff, m_port, timeout, m_ssl);
+        return m_net_client.connect(m_host_buff, m_port, timeout);
       }
 			//---------------------------------------------------------------------------
 			bool disconnect()
@@ -648,7 +648,7 @@ namespace net_utils
 
 							buff.erase(buff.begin(), ++it);
 
-							is_matched = true;				
+							is_matched = true;
 							return true;
 						}
 						else

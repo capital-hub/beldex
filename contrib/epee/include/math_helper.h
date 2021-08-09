@@ -32,9 +32,8 @@
 
 #include <list>
 #include <numeric>
-#include <boost/timer.hpp>
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/random_generator.hpp>
+#include <chrono>
+#include <atomic>
 
 #include "misc_os_dependent.h"
 #include "syncobj.h"

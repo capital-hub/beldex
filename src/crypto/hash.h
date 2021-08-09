@@ -71,8 +71,7 @@ namespace crypto {
     cn_fast_hash(data, length, reinterpret_cast<char *>(&h));
     return h;
   }
-  
-  
+
   enum struct cn_slow_hash_type
   {
       heavy_v0,

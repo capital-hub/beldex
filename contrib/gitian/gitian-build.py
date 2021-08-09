@@ -62,6 +62,12 @@ def build():
         subprocess.check_call(['bin/gsign', '-p', args.sign_prog, '--signer', args.signer, '--release', args.version+'-linux', '--destination', '../gitian.sigs/', '../beldex/contrib/gitian/gitian-linux.yml'])
         subprocess.check_call('mv build/out/beldex-*.tar.gz ../beldex-binaries/'+args.version, shell=True)
 
+    if args.android:
+        print('\nCompiling ' + args.version + ' Android')
+        subprocess.check_call(['bin/gbuild', '-j', args.jobs, '-m', args.memory, '--commit', 'monero='+args.commit, '--url', 'monero='+args.url, 'inputs/monero/contrib/gitian/gitian-android.yml'])
+        subprocess.check_call(['bin/gsign', '-p', args.sign_prog, '--signer', args.signer, '--release', args.version+'-android', '--destination', '../sigs/', 'inputs/monero/contrib/gitian/gitian-android.yml'])
+        subprocess.check_call('mv build/out/monero-*.tar.bz2 ../out/'+args.version, shell=True)
+
     if args.windows:
         print('\nCompiling ' + args.version + ' Windows')
         subprocess.check_call(['bin/gbuild', '-j', args.jobs, '-m', args.memory, '--commit', 'beldex='+args.commit, '--url', 'beldex='+args.url, '../beldex/contrib/gitian/gitian-win.yml'])
@@ -80,6 +86,7 @@ def build():
         print('\nCommitting '+args.version+' Unsigned Sigs\n')
         os.chdir('gitian.sigs')
         subprocess.check_call(['git', 'add', args.version+'-linux/'+args.signer])
+        subprocess.check_call(['git', 'add', args.version+'-android/'+args.signer])
         subprocess.check_call(['git', 'add', args.version+'-win/'+args.signer])
         subprocess.check_call(['git', 'add', args.version+'-osx/'+args.signer])
         subprocess.check_call(['git', 'commit', '-m', 'Add '+args.version+' unsigned sigs for '+args.signer])
@@ -91,6 +98,8 @@ def verify():
 
     print('\nVerifying v'+args.version+' Linux\n')
     subprocess.check_call(['bin/gverify', '-v', '-d', '../gitian.sigs/', '-r', args.version+'-linux', '../beldex/contrib/gitian/gitian-linux.yml'])
+    print('\nVerifying v'+args.version+' Android\n')
+    subprocess.check_call(['bin/gverify', '-v', '-d', '../gitian.sigs/', '-r', args.version+'-android', '../beldex/contrib/gitian/gitian-android.yml'])
     print('\nVerifying v'+args.version+' Windows\n')
     subprocess.check_call(['bin/gverify', '-v', '-d', '../gitian.sigs/', '-r', args.version+'-win', '../beldex/contrib/gitian/gitian-win.yml'])
     print('\nVerifying v'+args.version+' MacOS\n')
@@ -116,12 +125,13 @@ def main():
     parser.add_argument('-D', '--detach-sign', action='store_true', dest='detach_sign', help='Create the assert file for detached signing. Will not commit anything.')
     parser.add_argument('-n', '--no-commit', action='store_false', dest='commit_files', help='Do not commit anything to git')
     parser.add_argument('signer', help='GPG signer to sign each build assert file')
-    parser.add_argument('version', help='Version number, commit, or branch to build. If building a commit or branch, the -c option must be specified')
+    parser.add_argument('version', help='Version number, commit, or branch to build.')
 
     args = parser.parse_args()
     workdir = os.getcwd()
 
     args.linux = 'l' in args.os
+    args.android = 'a' in args.os
     args.windows = 'w' in args.os
     args.macos = 'm' in args.os
 
