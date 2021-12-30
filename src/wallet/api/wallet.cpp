@@ -1,5 +1,5 @@
-// Copyright (c) 2014-2018, The Monero Project
-// Copyright (c)      2018, The Beldex Project
+// Copyright (c) 2014-2019, The Monero Project
+// Copyright (c)      2018, The Loki Project
 //
 // All rights reserved.
 //
@@ -30,7 +30,7 @@
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #ifdef _WIN32
- #define __STDC_FORMAT_MACROS // NOTE(beldex): Explicitly define the PRIu64 macro on Mingw
+ #define __STDC_FORMAT_MACROS // NOTE(oxen): Explicitly define the PRIu64 macro on Mingw
 #endif
 
 #include "wallet.h"
@@ -51,6 +51,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <thread>
+#include <mutex>
 
 using namespace cryptonote;
 
@@ -71,7 +72,7 @@ namespace {
     fs::path get_default_ringdb_path(cryptonote::network_type nettype)
     {
       auto dir = tools::get_default_data_dir();
-      // remove .beldex, replace with .shared-ringdb
+      // remove .oxen, replace with .shared-ringdb
       dir.replace_filename(".shared-ringdb");
       if (nettype == cryptonote::TESTNET)
         dir /= "testnet";
@@ -91,7 +92,7 @@ namespace {
         if (!ready)
             throw std::runtime_error("Multisig wallet is not finalized yet");
     }
-    void checkMultisigWalletReady(const std::unique_ptr<tools::wallet2> &wallet) {
+     void checkMultisigWalletReady(const std::unique_ptr<tools::wallet2> &wallet) {
         return checkMultisigWalletReady(wallet.get());
     }
 
@@ -144,7 +145,7 @@ struct Wallet2CallbackImpl : public tools::i_wallet2_callback
     void on_new_block(uint64_t height, const cryptonote::block& block) override
     {
         // Don't flood the GUI with signals. On fast refresh - send signal every 1000th block
-        // get_refresh_from_block_height() returns the blockheight from when the wallet was
+        // get_refresh_from_block_height() returns the blockheight from when the wallet was 
         // created or the restore height specified when wallet was recovered
         if(height >= m_wallet->m_wallet->get_refresh_from_block_height() || height % 1000 == 0) {
             // LOG_PRINT_L3(__FUNCTION__ << ": new block. height: " << height);
@@ -348,7 +349,7 @@ bool Wallet::paymentIdValid(const std::string &payment_id)
 }
 
 EXPORT
-bool Wallet::masterNodePubkeyValid(const std::string &str)
+bool Wallet::serviceNodePubkeyValid(const std::string &str)
 {
     crypto::public_key mn_key;
     return str.size() == 64 && oxenmq::is_hex(str);
@@ -369,7 +370,7 @@ bool Wallet::keyValid(const std::string &secret_key_string, const std::string &a
       error = tr("Failed to parse address");
       return false;
   }
-
+  
   cryptonote::blobdata key_data;
   if(!epee::string_tools::parse_hexstr_to_binbuff(secret_key_string, key_data) || key_data.size() != sizeof(crypto::secret_key))
   {
@@ -394,7 +395,7 @@ bool Wallet::keyValid(const std::string &secret_key_string, const std::string &a
       error = tr("key does not match address");
       return false;
   }
-
+  
   return true;
 }
 
@@ -492,7 +493,7 @@ WalletImpl::~WalletImpl()
     m_wallet->callback(NULL);
     // Pause refresh thread - prevents refresh from starting again
     pauseRefresh();
-    // Close wallet - stores cache and stops ongoing refresh operation
+    // Close wallet - stores cache and stops ongoing refresh operation 
     close(false); // do not store wallet as part of the closing activities
     // Stop refresh thread
     stopRefresh();
@@ -704,7 +705,7 @@ bool WalletImpl::recoverFromKeysWithPassword(std::string_view path_,
            setSeedLanguage(language);
            LOG_PRINT_L1("Generated deterministic wallet from spend key with seed language: " + language);
         }
-
+        
     }
     catch (const std::exception& e) {
         setStatusError(std::string(tr("failed to generate new wallet: ")) + e.what());
@@ -1064,7 +1065,9 @@ uint64_t WalletImpl::balance(uint32_t accountIndex) const
 EXPORT
 uint64_t WalletImpl::unlockedBalance(uint32_t accountIndex) const
 {
-    return m_wallet->unlocked_balance(accountIndex, false);
+    uint64_t blocks_to_unlock, time_to_unlock;
+    std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
+    return m_wallet->unlocked_balance(accountIndex, false ,&blocks_to_unlock,&time_to_unlock,*hf_version);
 }
 
 EXPORT
@@ -1141,7 +1144,7 @@ uint64_t WalletImpl::daemonBlockChainTargetHeight() const
     } else {
         clearStatus();
     }
-    // Target height can be 0 when daemon is synced. Use blockchain height instead.
+    // Target height can be 0 when daemon is synced. Use blockchain height instead. 
     if(result == 0)
         result = daemonBlockChainHeight();
     return result;
@@ -1149,7 +1152,7 @@ uint64_t WalletImpl::daemonBlockChainTargetHeight() const
 
 EXPORT
 bool WalletImpl::daemonSynced() const
-{
+{   
     if(connected() == Wallet::ConnectionStatus_Disconnected)
         return false;
     uint64_t blockChainHeight = daemonBlockChainHeight();
@@ -1179,6 +1182,26 @@ void WalletImpl::refreshAsync()
     clearStatus();
     m_refreshCV.notify_one();
 }
+
+EXPORT
+// std::timed_mutex mtx;
+bool WalletImpl::isRefreshing(std::chrono::milliseconds max_wait) {
+     std::unique_lock lock(m_refreshMutex2,std::defer_lock);
+    return !lock.try_lock_for(max_wait);
+}
+//     std::unique_lock<std::timed_mutex> lck(mtx,std::defer_lock);
+   // waiting to get a lock: each thread prints "-" every 200ms:
+//   while (!lck.try_lock_for(std::chrono::milliseconds(50))) {
+//     return true;
+
+//     std::unique_lock<std::mutex> lock(m_refreshMutex2,std::defer_lock);
+   // print '*' if successfully locked, 'x' otherwise: 
+//   if (lock.try_lock_for(max_wait))
+//     return true;
+//   else                    
+//     return false;
+// }
+
 
 EXPORT
 bool WalletImpl::rescanBlockchain()
@@ -1224,7 +1247,7 @@ UnsignedTransaction* WalletImpl::loadUnsignedTx(std::string_view unsigned_filena
 
     return transaction;
   }
-
+  
   // Check tx data and construct confirmation message
   std::string extra_message;
   if (!transaction->m_unsigned_tx_set.transfers.second.empty())
@@ -1247,7 +1270,7 @@ bool WalletImpl::submitTransaction(std::string_view filename_) {
     setStatus(Status_Error, tr("Failed to load transaction from file"));
     return false;
   }
-
+  
   if(!transaction->commit()) {
     setStatusError(transaction->status().second);
     return false;
@@ -1257,7 +1280,7 @@ bool WalletImpl::submitTransaction(std::string_view filename_) {
 }
 
 EXPORT
-bool WalletImpl::exportKeyImages(std::string_view filename_)
+bool WalletImpl::exportKeyImages(std::string_view filename_) 
 {
   auto filename = fs::u8path(filename_);
   if (m_wallet->watch_only())
@@ -1265,7 +1288,7 @@ bool WalletImpl::exportKeyImages(std::string_view filename_)
     setStatusError(tr("Wallet is view only"));
     return false;
   }
-
+  
   try
   {
     if (!m_wallet->export_key_images_to_file(filename, false /* requested_ki_only */))
@@ -1532,7 +1555,7 @@ PendingTransaction *WalletImpl::createTransactionMultDest(const std::vector<std:
     clearStatus();
     // Pause refresh thread while creating transaction
     pauseRefresh();
-
+      
     cryptonote::address_parse_info info;
 
     PendingTransactionImpl * transaction = new PendingTransactionImpl(*this);
@@ -1596,33 +1619,6 @@ PendingTransaction *WalletImpl::createTransactionMultDest(const std::vector<std:
               setStatusError(tools::ERR_MSG_NETWORK_VERSION_QUERY_FAILED);
               return transaction;
             }
-        }
-        if (error) {
-            break;
-        }
-        if (!extra_nonce.empty() && !add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
-            setStatusError(tr("failed to set up payment id, though it was decoded correctly"));
-            break;
-        }
-        try {
-            std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
-            if (!hf_version)
-            {
-              setStatusError(tools::ERR_MSG_NETWORK_VERSION_QUERY_FAILED);
-              return transaction;
-            }
-
-            if (amount) {
-                beldex_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::standard, priority);
-                transaction->m_pending_tx = m_wallet->create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, 0 /* unlock_time */,
-                                                                            priority,
-                                                                            extra, subaddr_account, subaddr_indices, tx_params);
-            } else {
-                transaction->m_pending_tx = m_wallet->create_transactions_all(0, info.address, info.is_subaddress, 1, CRYPTONOTE_DEFAULT_TX_MIXIN, 0 /* unlock_time */,
-                                                                              priority,
-                                                                              extra, subaddr_account, subaddr_indices);
-            }
-            pendingTxPostProcess(transaction);
 
             if (amount) {
                 beldex_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::standard, priority);
@@ -2360,7 +2356,7 @@ bool WalletImpl::isNewWallet() const
     // it's the same case as if it created from scratch, i.e. we need "fast sync"
     // with the daemon (pull hashes instead of pull blocks).
     // If wallet cache is rebuilt, creation height stored in .keys is used.
-    // Watch only wallet is a copy of an existing wallet.
+    // Watch only wallet is a copy of an existing wallet. 
     return !(blockChainHeight() > 1 || m_recoveringFromSeed || m_recoveringFromDevice || m_rebuildWalletCache) && !watchOnly();
 }
 
@@ -2451,9 +2447,9 @@ std::optional<uint8_t> WalletImpl::hardForkVersion() const
 }
 
 EXPORT
-bool WalletImpl::useForkRules(uint8_t version, int64_t early_blocks) const
+bool WalletImpl::useForkRules(uint8_t version, int64_t early_blocks) const 
 {
-    return m_wallet->use_fork_rules(version,early_blocks);
+    return m_wallet->use_fork_rules(version=17,early_blocks);
 }
 
 EXPORT
@@ -2646,7 +2642,7 @@ PendingTransaction* WalletImpl::stakePending(const std::string& mn_key_str, cons
   crypto::public_key mn_key;
   if (!tools::hex_to_type(mn_key_str, mn_key))
   {
-    error_msg = "Failed to parse master node pubkey";
+    error_msg = "Failed to parse service node pubkey";
     LOG_ERROR(error_msg);
     transaction->setError(error_msg);
     return transaction;
@@ -2673,7 +2669,7 @@ StakeUnlockResult* WalletImpl::canRequestStakeUnlock(const std::string &mn_key)
     {
       tools::wallet2::request_stake_unlock_result res{};
       res.success = false;
-      res.msg = "Failed to Parse Master Node Key";
+      res.msg = "Failed to Parse Service Node Key";
       return new StakeUnlockResultImpl(*this, res);
     }
 
@@ -2689,7 +2685,7 @@ StakeUnlockResult* WalletImpl::requestStakeUnlock(const std::string &mn_key)
     if (!tools::hex_to_type(mn_key, mnode_key))
     {
       res.success = false;
-      res.msg = "Failed to Parse Master Node Key";
+      res.msg = "Failed to Parse Service Node Key";
       return new StakeUnlockResultImpl(*this, res);
     }
     tools::wallet2::request_stake_unlock_result unlock_result = m_wallet->can_request_stake_unlock(mnode_key);

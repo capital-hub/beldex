@@ -50,7 +50,7 @@ size_t calculateExcess(const swarm_mnode_map_t& swarm_to_mnodes) {
   });
 }
 
-size_t getExpectedNumSwarmsNoDereg(size_t num_mnodes) {
+size_t getExpectedNumSwarmmNoDereg(size_t num_mnodes) {
   /// The number of swarm (y) should be a step function of the number of mnodes (x).
   /// Assuming the ideal size is 7:
   /// 1 <= x < 14 : y = 1
@@ -61,8 +61,8 @@ size_t getExpectedNumSwarmsNoDereg(size_t num_mnodes) {
   return 1 + std::max(diff, ssize_t(0)) / IDEAL_SWARM_SIZE;
 }
 
-void validateSwarmsNoDereg(const swarm_mnode_map_t& swarm_to_mnodes, size_t num_mnodes) {
-  const size_t expected_num_swarms = getExpectedNumSwarmsNoDereg(num_mnodes);
+void validateSwarmmNoDereg(const swarm_mnode_map_t& swarm_to_mnodes, size_t num_mnodes) {
+  const size_t expected_num_swarms = getExpectedNumSwarmmNoDereg(num_mnodes);
   ASSERT_EQ(expected_num_swarms, swarm_to_mnodes.size()) << " Failed with num_mnodes:" << num_mnodes;
 
   /// Expected excess
@@ -92,7 +92,7 @@ void registerInitialMnodes(swarm_mnode_map_t& swarm_to_mnodes, size_t reg_per_bl
     unassigned_mnodes.clear();
     num_mnodes += reg_per_block;
     LOG_PRINT_L2("num_mnodes: " << num_mnodes);
-    validateSwarmsNoDereg(swarm_to_mnodes, num_mnodes);
+    validateSwarmmNoDereg(swarm_to_mnodes, num_mnodes);
   }
 }
 

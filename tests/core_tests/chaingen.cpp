@@ -404,9 +404,9 @@ cryptonote::transaction beldex_chain_generator::create_and_add_state_change_tx(m
   return result;
 }
 
-cryptonote::transaction beldex_chain_generator::create_and_add_registration_tx(const cryptonote::account_base &src, const cryptonote::keypair &sn_keys, bool kept_by_block)
+cryptonote::transaction beldex_chain_generator::create_and_add_registration_tx(const cryptonote::account_base &src, const cryptonote::keypair &mn_keys, bool kept_by_block)
 {
-  cryptonote::transaction result = create_registration_tx(src, sn_keys);
+  cryptonote::transaction result = create_registration_tx(src, mn_keys);
   add_tx(result, true /*can_be_added_to_blockchain*/, "" /*fail_msg*/, kept_by_block);
   return result;
 }
@@ -912,10 +912,10 @@ bool beldex_chain_generator::block_begin(beldex_blockchain_entry &entry, beldex_
   // NOTE: Calculate governance
   cryptonote::beldex_miner_tx_context miner_tx_context;
   master_nodes::quorum POS_quorum;
-  std::vector<master_nodes::pubkey_and_mninfo> active_snode_list =
+  std::vector<master_nodes::pubkey_and_mninfo> active_mnode_list =
       params.prev.master_node_state.active_master_nodes_infos();
 
-  bool POS_block_is_possible = blk.major_version >= cryptonote::network_version_17_POS && active_snode_list.size() >= master_nodes::POS_min_master_nodes(cryptonote::FAKECHAIN);
+  bool POS_block_is_possible = blk.major_version >= cryptonote::network_version_17_POS && active_mnode_list.size() >= master_nodes::POS_min_master_nodes(cryptonote::FAKECHAIN);
   bool make_POS_block        = (params.type == beldex_create_block_type::automatic && POS_block_is_possible) || params.type == beldex_create_block_type::POS;
 
   if (make_POS_block)
@@ -928,7 +928,7 @@ bool beldex_chain_generator::block_begin(beldex_blockchain_entry &entry, beldex_
 
     // NOTE: Get POS Quorum necessary for this block
     std::vector<crypto::hash> entropy = master_nodes::get_POS_entropy_for_next_block(db_, params.prev.block, blk.POS.round);
-    POS_quorum = master_nodes::generate_POS_quorum(cryptonote::FAKECHAIN, params.block_leader.key, blk.major_version, active_snode_list, entropy, blk.POS.round);
+    POS_quorum = master_nodes::generate_POS_quorum(cryptonote::FAKECHAIN, params.block_leader.key, blk.major_version, active_mnode_list, entropy, blk.POS.round);
     assert(POS_quorum.validators.size() == master_nodes::POS_QUORUM_NUM_VALIDATORS);
     assert(POS_quorum.workers.size() == 1);
 

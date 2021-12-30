@@ -2763,11 +2763,11 @@ bool beldex_master_nodes_gen_nodes::generate(std::vector<test_event_entry> &even
   return true;
 }
 
-using sn_info_t = master_nodes::master_node_pubkey_info;
-static bool contains(const std::vector<sn_info_t>& infos, const crypto::public_key& key)
+using mn_info_t = master_nodes::master_node_pubkey_info;
+static bool contains(const std::vector<mn_info_t>& infos, const crypto::public_key& key)
 {
   const auto it =
-    std::find_if(infos.begin(), infos.end(), [&key](const sn_info_t& info) { return info.pubkey == key; });
+    std::find_if(infos.begin(), infos.end(), [&key](const mn_info_t& info) { return info.pubkey == key; });
   return it != infos.end();
 }
 
@@ -2800,7 +2800,7 @@ bool beldex_master_nodes_test_rollback::generate(std::vector<test_event_entry>& 
   beldex_register_callback(events, "test_registrations", [&events, deregister_index, reg_evnt_idx](cryptonote::core &c, size_t ev_index)
   {
     DEFINE_TESTS_ERROR_CONTEXT("test_registrations");
-    const auto sn_list = c.get_master_node_list_state({});
+    const auto mn_list = c.get_master_node_list_state({});
     /// Test that node A is still registered
     {
       /// obtain public key of node A
@@ -2818,7 +2818,7 @@ bool beldex_master_nodes_test_rollback::generate(std::vector<test_event_entry>& 
       const auto pk_a = uptime_quorum->workers.at(deregistration.master_node_index);
 
       /// Check present
-      const bool found_a = contains(sn_list, pk_a);
+      const bool found_a = contains(mn_list, pk_a);
       CHECK_AND_ASSERT_MES(found_a, false, "Node deregistered in alt chain is not found in the main chain after reorg.");
     }
 
@@ -2836,7 +2836,7 @@ bool beldex_master_nodes_test_rollback::generate(std::vector<test_event_entry>& 
       }
 
       /// Check not present
-      const bool found_b = contains(sn_list, pk_b);
+      const bool found_b = contains(mn_list, pk_b);
       CHECK_AND_ASSERT_MES(!found_b, false, "Node registered in alt chain is present in the main chain after reorg.");
     }
     return true;
@@ -2854,13 +2854,13 @@ bool beldex_master_nodes_test_swarms_basic::generate(std::vector<test_event_entr
   gen.add_blocks_until_version(hard_forks.rbegin()[1].version);
 
   /// Create some master nodes before hf version 10
-  constexpr size_t INIT_SN_COUNT  = 13;
-  constexpr size_t TOTAL_SN_COUNT = 25;
+  constexpr size_t INIT_MN_COUNT  = 13;
+  constexpr size_t TOTAL_MN_COUNT = 25;
   gen.add_n_blocks(90);
   gen.add_mined_money_unlock_blocks();
 
   /// register some master nodes
-  add_master_nodes(gen, INIT_SN_COUNT);
+  add_master_nodes(gen, INIT_MN_COUNT);
 
   /// create a few blocks with active master nodes
   gen.add_n_blocks(5);
@@ -2986,21 +2986,21 @@ bool beldex_master_nodes_insufficient_contribution::generate(std::vector<test_ev
 
   uint64_t operator_portions = STAKING_PORTIONS / 2;
   uint64_t remaining_portions = STAKING_PORTIONS - operator_portions;
-  cryptonote::keypair sn_keys{hw::get_device("default")};
-  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_portions);
+  cryptonote::keypair mn_keys{hw::get_device("default")};
+  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, mn_keys, operator_portions);
   gen.add_tx(register_tx);
   gen.create_and_add_next_block({register_tx});
 
-  cryptonote::transaction stake = gen.create_and_add_staking_tx(sn_keys.pub, gen.first_miner_, MK_COINS(1));
+  cryptonote::transaction stake = gen.create_and_add_staking_tx(mn_keys.pub, gen.first_miner_, MK_COINS(1));
   gen.create_and_add_next_block({stake});
 
-  beldex_register_callback(events, "test_insufficient_stake_does_not_get_accepted", [sn_keys](cryptonote::core &c, size_t ev_index)
+  beldex_register_callback(events, "test_insufficient_stake_does_not_get_accepted", [mn_keys](cryptonote::core &c, size_t ev_index)
   {
     DEFINE_TESTS_ERROR_CONTEXT("test_insufficient_stake_does_not_get_accepted");
-    const auto sn_list = c.get_master_node_list_state({sn_keys.pub});
-    CHECK_TEST_CONDITION(sn_list.size() == 1);
+    const auto mn_list = c.get_master_node_list_state({mn_keys.pub});
+    CHECK_TEST_CONDITION(mn_list.size() == 1);
 
-    master_nodes::master_node_pubkey_info const &pubkey_info = sn_list[0];
+    master_nodes::master_node_pubkey_info const &pubkey_info = mn_list[0];
     CHECK_EQ(pubkey_info.info->total_contributed, MK_COINS(50));
     return true;
   });
