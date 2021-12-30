@@ -349,7 +349,7 @@ bool Wallet::paymentIdValid(const std::string &payment_id)
 }
 
 EXPORT
-bool Wallet::serviceNodePubkeyValid(const std::string &str)
+bool Wallet::masterNodePubkeyValid(const std::string &str)
 {
     crypto::public_key mn_key;
     return str.size() == 64 && oxenmq::is_hex(str);
